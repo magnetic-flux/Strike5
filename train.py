@@ -4,6 +4,8 @@ from functools import partial
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.wrappers import ActionMasker
 
 from strike5_environment import Strike5Env
 from metrics_callback import MetricsCallback
@@ -25,7 +27,7 @@ END_GAME_NUM_INVALID_MOVES = math.inf  # math.inf = disable
 END_GAME_NUM_REPEATED_MOVES = math.inf  # math.inf = disable
 END_GAME_NUM_ATTEMPTED_MOVES = math.inf  # math.inf = disable
 
-LEARNING_RATE = 0.01  # 0.00001 to 0.003
+LEARNING_RATE = 0.001  # 0.00001 to 0.003
 N_STEPS = 512  # 256 to 2048
 BATCH_SIZE = 64  # 32 to 256
 N_EPOCHS = 8  # 3 to 10
@@ -36,8 +38,8 @@ ENTROPY_COEFFICIENT = 0.01  # 0 to 0.01
 VALUE_FUNCTION_COEFFICIENT = 0.5  # 0.5 to 1
 MAX_GRADIENT_NORM = 0.5  # 0.5 to 1
 
-RESUME_TRAINING_FROM_CHECKPOINT = True
-CHECKPOINT_PATH = "./logs_sb3/3_20_clear_1.zip"
+RESUME_TRAINING_FROM_CHECKPOINT = False
+CHECKPOINT_PATH = "./logs_sb3/strike5_ppo_1350000_steps.zip"
 
 SAVE_FREQUENCY = 50000
 TOTAL_TIMESTEPS = 2000000
@@ -48,6 +50,7 @@ def make_env(rank, seed=69420):
         np.random.seed(seed + rank)
         random.seed(seed + rank)
         env = Strike5Env(clear_ball_reward=CLEAR_BALL_REWARD, repeat_move_reward=REPEAT_MOVE_REWARD, occupied_empty_reward=OCCUPIED_EMPTY_REWARD, occupied_empty_no_path_reward=OCCUPIED_EMPTY_NO_PATH_REWARD, occupied_occupied_reward=OCCUPIED_OCCUPIED_REWARD, empty_empty_reward=EMPTY_EMPTY_REWARD, empty_occupied_reward=EMPTY_OCCUPIED_REWARD, end_game_board_percentage=END_GAME_BOARD_PERCENTAGE, end_game_num_valid_moves=END_GAME_NUM_VALID_MOVES, end_game_num_invalid_moves=END_GAME_NUM_INVALID_MOVES, end_game_num_repeated_moves=END_GAME_NUM_REPEATED_MOVES, end_game_num_attempted_moves=END_GAME_NUM_ATTEMPTED_MOVES, custom_spawn_range=CUSTOM_SPAWN_RANGE, probability_of_regular_spawn=PROBABILITY_OF_REGULAR_SPAWN, scale_rewards=SCALE_REWARDS)
+        env = ActionMasker(env, lambda env: env.action_masks())
         return env
     return _init
 
@@ -57,8 +60,8 @@ def main():
     raw_vec = DummyVecEnv([make_env(i, seed=42) for i in range(NUM_ENVIRONMENTS)])
     vec_env = VecNormalize(raw_vec, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
-    model = PPO(
-        "MlpPolicy",
+    model = MaskablePPO(
+        "MultiInputPolicy",
         vec_env,
         verbose = 1,
         device = "cpu",

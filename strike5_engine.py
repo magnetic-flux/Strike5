@@ -103,26 +103,34 @@ def find_matches(board, positions): # Check for lines going through the given po
 def apply_move(state, start, end): # Returns valididty of move; if valid, moves ball, increments moves, clears matches, updates score, and spawns new balls
     board = state['board']
     validity = is_valid_move(board, start, end)
-    if validity != 0: return validity
+    result = {"validity": validity, "cleared": [], "spawned": []}
+    if validity != 0: return result
     
     board[end], board[start] = board[start], 0
     state['empties'].discard(end); state['empties'].add(start)
     state['moves'] += 1
     
     cleared = find_matches(board, [end])
+    result["cleared"] = cleared
     state['score'] += len(cleared)
     if len(cleared) > 0:
         board[tuple(zip(*cleared))] = 0
         for cell in cleared: state['empties'].add(cell)
-        return -1
+        result["validity"] = -1
+        return result
     
-    cleared_due_to_spawned_balls = find_matches(board, spawn_balls(state))
-    if len(cleared_due_to_spawned_balls) > 0: board[tuple(zip(*cleared_due_to_spawned_balls))] = 0
-    return 0
+    spawned = spawn_balls(state)
+    cleared_due_to_spawned_balls = find_matches(board, spawned)
+    result["spawned"] = spawned
+    if len(cleared_due_to_spawned_balls) > 0:
+        board[tuple(zip(*cleared_due_to_spawned_balls))] = 0
+        result["cleared"].extend(cleared_due_to_spawned_balls)
+
+    return result
 
 
 # --- Rendering --- 
-
+# (No changes to rendering code)
 def find_path(board, start, end):
     sr, sc = start; er, ec = end
     if board[er, ec] != 0: return None
