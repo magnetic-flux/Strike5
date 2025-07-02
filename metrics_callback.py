@@ -1,63 +1,69 @@
+import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
 class MetricsCallback(BaseCallback):
     def __init__(self, verbose=0):
         super().__init__(verbose)
         self.moves = 0
-        self.validity_0s = self.validity_05s = self.validity_1s = self.validity_2s = self.validity_3s = 0
-        self.reward_sum = 0
         self.clears = 0
-        self.current_game_length = 0
+        self.validity_0s = 0
+        self.validity_05s = 0
         self.num_repeat_moves = 0
-        self.game_lengths = []
-        self.num_balls_on_valid = []
-        self.num_balls_on_clear = []
+
+        self.current_game_reward = 0
+        self.current_game_valid_moves = 0
+        
+        self.game_rewards = []
+        self.game_lengths_valid_moves = []
+
 
     def _on_step(self) -> bool:
         info = self.locals["infos"][0]
-        self.moves += 1; self.current_game_length += 1
+        self.moves += 1
+        self.current_game_reward += info["reward"]
+
+        validity = info["validity"]
+        if validity == -1:
+            self.clears += 1
+            self.current_game_valid_moves += 1
+        elif validity == 0:
+            self.validity_0s += 1
+            self.current_game_valid_moves += 1
+        elif validity == 0.5:
+            self.validity_05s += 1
         
+        if info["is_repeat"]:
+            self.num_repeat_moves += 1
+
         if info["truncated"] or info["terminated"]:
-            self.game_lengths.append(self.current_game_length)
-            self.current_game_length = 0
+            self.game_rewards.append(self.current_game_reward)
+            self.game_lengths_valid_moves.append(self.current_game_valid_moves)
+            self.current_game_reward = 0
+            self.current_game_valid_moves = 0
 
-        if info["validity"] == -1: self.clears += 1; self.num_balls_on_valid.append(info["num_balls_on_valid"]); self.num_balls_on_clear.append(info["num_balls_on_valid"]) 
-        if info["validity"] == 0: self.validity_0s += 1; self.num_balls_on_valid.append(info["num_balls_on_valid"])
-        elif info["validity"] == 0.5: self.validity_05s += 1
-        elif info["validity"] == 1: self.validity_1s += 1
-        elif info["validity"] == 2: self.validity_2s += 1
-        else: self.validity_3s += 1
-
-        if info["is_repeat"]: self.num_repeat_moves += 1
-
-        self.reward_sum += info["reward"]
         return True
     
     def _on_rollout_end(self):
-        self.game_lengths.append(self.current_game_length)
-        print(self.num_balls_on_valid)
-        print(self.num_balls_on_clear)
-        self.logger.record("Telemetry/1. Number of clears per game", self.clears / len(self.game_lengths))
-        self.logger.record("Telemetry/2. OCCUPIED to EMPTY (0)", self.validity_0s / self.moves)
-        self.logger.record("Telemetry/3. OCCUPIED to EMPTY but no path (0.5)", self.validity_05s / self.moves)
-        self.logger.record("Telemetry/4. OCCUPIED to OCCUPIED (1)", self.validity_1s / self.moves)
-        self.logger.record("Telemetry/5. EMPTY to EMPTY (2)", self.validity_2s / self.moves)
-        self.logger.record("Telemetry/6. EMPTY to OCCUPIED (3)", self.validity_3s / self.moves)
-        self.logger.record("Telemetry/7. Average game length", sum(self.game_lengths) / len(self.game_lengths))
-        self.logger.record("Telemetry/8. Number of repeat moves", self.num_repeat_moves)
-        self.logger.record("Telemetry/9. Number of valid moves per game", (self.validity_0s / len(self.game_lengths)) if self.game_lengths else 0)
-        
+        total_games = len(self.game_lengths_valid_moves)
+        if total_games == 0:
+            print("No completed games this rollout")
+            total_games = 1
+            self.game_lengths_valid_moves.append(self.current_game_valid_moves)
+
+        self.logger.record("Telemetry/1. Average game length", np.mean(self.game_lengths_valid_moves))
+        self.logger.record("Telemetry/2. Average clears per game", self.clears / total_games)
+        self.logger.record("Telemetry/3. Average reward per game", np.mean(self.game_rewards))
+        self.logger.record("Telemetry/4. Fraction of moves that are valid with no clear", self.validity_0s / self.moves)
+        self.logger.record("Telemetry/5. Fraction moves that clear balls", self.clears / self.moves)
+        self.logger.record("Telemetry/6. Fraction of moves that are invalid with no path", self.validity_05s / self.moves)
+        self.logger.record("Telemetry/7. Average number of repeat moves per game", self.num_repeat_moves / total_games)
+
         self.moves = 0
+        self.clears = 0
         self.validity_0s = 0
         self.validity_05s = 0
-        self.validity_1s = 0
-        self.validity_2s = 0
-        self.validity_3s = 0
-        self.reward_sum = 0
-        self.clears = 0
-        self.done_count = 0
-        self.current_game_length = 0
         self.num_repeat_moves = 0
-        self.game_lengths = []
-        self.num_balls_on_valid = []
-        self.num_balls_on_clear = []
+        self.current_game_reward = 0
+        self.current_game_valid_moves = 0
+        self.game_rewards = []
+        self.game_lengths_valid_moves = []

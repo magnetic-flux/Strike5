@@ -6,7 +6,7 @@ from collections import deque
 
 GRID_SIZE = 9
 SPAWN_COUNT = 3
-LINE_LENGTH = 2
+LINE_LENGTH = 3
 
 CELL_SIZE = 60
 MARGIN = 2
@@ -129,8 +129,8 @@ def apply_move(state, start, end): # Returns valididty of move; if valid, moves 
     return result
 
 
-# --- Rendering --- 
-# (No changes to rendering code)
+# --- Rendering ---
+
 def find_path(board, start, end):
     sr, sc = start; er, ec = end
     if board[er, ec] != 0: return None
