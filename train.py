@@ -1,9 +1,8 @@
 import os, random, math, numpy as np
 from functools import partial
 
-from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 
@@ -87,7 +86,7 @@ def main():
     )
 
     if RESUME_TRAINING_FROM_CHECKPOINT and os.path.isfile(CHECKPOINT_PATH):
-        old_model = PPO.load(CHECKPOINT_PATH, env=None)
+        old_model = MaskablePPO.load(CHECKPOINT_PATH, env=None)
         model.policy.load_state_dict(old_model.policy.state_dict())
         model.set_env(vec_env)
         print("Resuming training from " + CHECKPOINT_PATH)
