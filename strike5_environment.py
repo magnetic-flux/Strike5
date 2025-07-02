@@ -54,7 +54,11 @@ class Strike5Env(gym.Env):
 
     def get_observation(self): return {"observation": np.concatenate([self.state["board"].flatten(), self.state["next_colors"]]).astype(np.int8), "action_mask": self.action_masks()}
 
-    def action_masks(self): return np.outer(self.start_mask, self.end_mask).flatten()
+    def action_masks(self):
+        flat_board = self.state['board'].flatten()
+        start_mask = flat_board != 0
+        end_mask = flat_board == 0
+        return np.outer(start_mask, end_mask).flatten()
 
     def step(self, action):
         start_square, end_square = divmod(action, GRID_SIZE**2)
