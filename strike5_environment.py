@@ -53,8 +53,13 @@ class Strike5Env(gym.Env):
         flat_board = self.state['board'].flatten()
         start_mask = flat_board != 0  # Can only start from an occupied square
         end_mask = flat_board == 0    # Can only end on an empty square
-        # The outer product gives a mask for every start-end pair
-        return np.outer(start_mask, end_mask).flatten()
+        
+        mask = np.outer(start_mask, end_mask).flatten()
+
+        # Failsafe to prevent an all-False mask
+        if not np.any(mask): mask[0] = True
+            
+        return mask
 
     def step(self, action):
         start_square, end_square = divmod(action, GRID_SIZE**2)
@@ -76,8 +81,8 @@ class Strike5Env(gym.Env):
         elif validity == 0.5:
             reward = self.invalid_move_reward
         else:
-            print("womp womp")
-            reward = 0
+            print("this should never execute")
+            reward = self.invalid_move_reward
         
         last_start, last_end = divmod(self.last_action, GRID_SIZE**2)
         is_repeat = start_square == last_end and end_square == last_start
@@ -85,11 +90,16 @@ class Strike5Env(gym.Env):
             reward += self.repeat_move_reward
             self.num_repeated_moves += 1
         self.last_action = action
+
+        #TODO: aaaa
+        if len(move_result["cleared"]) == 4: reward = 100
+        elif len(move_result["cleared"]) == 5: reward = 500
         
         if self.scale_rewards: reward = reward * self.num_valid_moves
 
         terminated = (
             (num_empty == 0) or
+            (num_empty == GRID_SIZE**2) or
             (num_empty <= GRID_SIZE**2 * (1 - self.end_game_board_percentage)) or
             (self.num_attempted_moves >= self.end_game_num_attempted_moves) or
             (self.num_valid_moves >= self.end_game_num_valid_moves) or
@@ -105,7 +115,8 @@ class Strike5Env(gym.Env):
             "terminated": terminated,
             "truncated": truncated,
             "num_balls_on_valid": self.num_balls_on_valid,
-            "is_repeat": is_repeat
+            "is_repeat": is_repeat,
+            "num_cleared": len(move_result["cleared"])
         }
         return observation, reward, terminated, truncated, info
 

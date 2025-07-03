@@ -9,10 +9,10 @@ from sb3_contrib.common.wrappers import ActionMasker
 from strike5_environment import Strike5Env
 from metrics_callback import MetricsCallback
 
-CLEAR_BALL_REWARD = 20
+CLEAR_BALL_REWARD = 25
 REPEAT_MOVE_REWARD = -20
 VALID_MOVE_REWARD = 0
-INVALID_MOVE_REWARD = -20
+INVALID_MOVE_REWARD = -1
 
 SCALE_REWARDS = False
 CUSTOM_SPAWN_RANGE = (3, 3)
@@ -35,9 +35,9 @@ VALUE_FUNCTION_COEFFICIENT = 0.5
 MAX_GRADIENT_NORM = 0.5
 
 RESUME_TRAINING_FROM_CHECKPOINT = True
-CHECKPOINT_PATH = "./logs_sb3/mask_1.zip"
-SAVE_FREQUENCY = 50000
-TOTAL_TIMESTEPS = 2000000
+CHECKPOINT_PATH = "./logs_sb3/mask_2.zip"
+SAVE_FREQUENCY = 100000
+TOTAL_TIMESTEPS = 4000000
 NUM_ENVIRONMENTS = 8
 
 def make_env(rank, seed=69420):
@@ -104,7 +104,7 @@ def main():
         total_timesteps = TOTAL_TIMESTEPS,
         callback = [checkpoint_cb, metrics_cb],
         tb_log_name = "strike5_run",
-        reset_num_timesteps = not RESUME_TRAINING_FROM_CHECKPOINT
+        reset_num_timesteps = True
     )
 
     model.save(os.path.join(log_dir, "strike5_ppo_final"))
