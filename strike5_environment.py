@@ -22,7 +22,10 @@ class Strike5Env(gym.Env):
         self.scale_rewards = scale_rewards
 
         self.observation_space = Dict({
-            "action_mask": Box(low=0, high=1, shape=(2 * GRID_SIZE**2,), dtype=bool),
+            "action_mask": spaces.Tuple((
+                Box(low=0, high=1, shape=(GRID_SIZE**2,), dtype=bool),
+                Box(low=0, high=1, shape=(GRID_SIZE**2,), dtype=bool)
+            )),
             "observation": Box(low=0, high=7, shape=(GRID_SIZE**2 + SPAWN_COUNT,), dtype=np.int8),
         })
         self.action_space = MultiDiscrete([GRID_SIZE**2, GRID_SIZE**2])
@@ -55,14 +58,10 @@ class Strike5Env(gym.Env):
         end_mask = flat_board == 0    # Can only end on an empty square
 
         # Failsafe to prevent an all-False mask
-        if not start_mask.any():
-            start_mask[:] = True
-            print("Failsafe: start_mask was all-False; now all True")
-        if not end_mask.any():
-            end_mask[:] = True
-            print("Failsafe:   end_mask was all-False; now all True")
+        if not start_mask.any(): start_mask[:] = True
+        if not end_mask.any(): end_mask[:] = True
             
-        return np.concatenate([start_mask, end_mask])
+        return (start_mask, end_mask)
 
     def step(self, action):
         start_square, end_square = int(action[0]), int(action[1])
@@ -94,7 +93,6 @@ class Strike5Env(gym.Env):
             self.num_repeated_moves += 1
         self.last_action = [start_square, end_square]
 
-        #TODO: aaaa
         if len(move_result["cleared"]) == 4: reward = 100
         elif len(move_result["cleared"]) == 5: reward = 500
         
