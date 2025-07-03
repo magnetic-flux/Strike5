@@ -1,7 +1,7 @@
 import math, random, numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from gymnasium.spaces import Dict, Box, Discrete, MultiDiscrete
+from gymnasium.spaces import Dict, Box, Discrete
 from strike5_engine import reset_board, apply_move, spawn_balls, GRID_SIZE, SPAWN_COUNT
 
 class Strike5Env(gym.Env):
@@ -21,20 +21,18 @@ class Strike5Env(gym.Env):
         self.probability_of_regular_spawn = probability_of_regular_spawn
         self.scale_rewards = scale_rewards
 
+        self.action_space = Discrete(GRID_SIZE**4)
+        
         self.observation_space = Dict({
-            "action_mask": spaces.Tuple((
-                Box(low=0, high=1, shape=(GRID_SIZE**2,), dtype=bool),
-                Box(low=0, high=1, shape=(GRID_SIZE**2,), dtype=bool)
-            )),
+            "action_mask": Box(low=0, high=1, shape=(GRID_SIZE**4,), dtype=bool),
             "observation": Box(low=0, high=7, shape=(GRID_SIZE**2 + SPAWN_COUNT,), dtype=np.int8),
         })
-        self.action_space = MultiDiscrete([GRID_SIZE**2, GRID_SIZE**2])
         
         self.state = None
         self.num_attempted_moves = 0
         self.num_valid_moves = 0
         self.num_balls_on_valid = 0
-        self.last_action = [0, 0]
+        self.last_action = 0
         self.num_repeated_moves = 0
 
     def reset(self, *, seed=None, options=None):
@@ -56,15 +54,16 @@ class Strike5Env(gym.Env):
         flat_board = self.state['board'].flatten()
         start_mask = flat_board != 0  # Can only start from an occupied square
         end_mask = flat_board == 0    # Can only end on an empty square
+        
+        valid_pairs_mask = np.outer(start_mask, end_mask)
 
-        # Failsafe to prevent an all-False mask
-        if not start_mask.any(): start_mask[:] = True
-        if not end_mask.any(): end_mask[:] = True
-            
-        return (start_mask, end_mask)
+        if not valid_pairs_mask.any():
+            return np.ones(GRID_SIZE**4, dtype=bool)
+
+        return valid_pairs_mask.flatten()
 
     def step(self, action):
-        start_square, end_square = int(action[0]), int(action[1])
+        start_square, end_square = divmod(int(action), GRID_SIZE**2)
         sr, sc = divmod(start_square, GRID_SIZE)
         er, ec = divmod(end_square, GRID_SIZE)
 
@@ -86,12 +85,12 @@ class Strike5Env(gym.Env):
             print("this should never execute")
             reward = self.invalid_move_reward
         
-        last_start, last_end = self.last_action
+        last_start, last_end = divmod(self.last_action, GRID_SIZE**2)
         is_repeat = (start_square == last_end) and (end_square == last_start)
         if is_repeat:
             reward += self.repeat_move_reward
             self.num_repeated_moves += 1
-        self.last_action = [start_square, end_square]
+        self.last_action = action
 
         if len(move_result["cleared"]) == 4: reward = 100
         elif len(move_result["cleared"]) == 5: reward = 500
