@@ -2,7 +2,7 @@ import math, random, numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from gymnasium.spaces import Dict, Box, MultiDiscrete
-from strike5_engine import reset_board, apply_move, spawn_balls, GRID_SIZE, SPAWN_COUNT
+from strike5_engine import reset_board, apply_move, spawn_balls, GRID_SIZE, SPAWN_COUNT, LINE_LENGTH
 
 class Strike5Env(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
@@ -83,11 +83,10 @@ class Strike5Env(gym.Env):
 
         reward = 0
         if validity == -1:
-            base_reward = self.clear_ball_reward
             cleared_count = len(move_result["cleared"])
-            if cleared_count == 4: base_reward += 75
-            elif cleared_count >= 5: base_reward += 475
-            reward = base_reward
+            if cleared_count == 3: reward = self.clear_ball_reward
+            elif cleared_count == 4: reward = 50  # Do not change these values; I want the model to specifically learn to clear balls of length 4 and 5 (5 is the end goal), and they are extremeley unlikely to occur if moves are random
+            elif cleared_count == 5: reward = 100
             self.num_valid_moves += 1
         elif validity == 0:
             reward = self.valid_move_reward
@@ -100,7 +99,7 @@ class Strike5Env(gym.Env):
             reward = self.invalid_move_reward
         
         last_start, last_end = self.last_action[0], self.last_action[1]
-        is_repeat = (start_square == last_end) and (end_square == last_start)
+        is_repeat = ((start_square == last_end) and (end_square == last_start)) or ((start_square == last_start) and (end_square == last_end))  # A repeat is if the model tries to suggest two of the same moves, OR if it tried shuffling a single ball back and forth forever
         if is_repeat:
             reward += self.repeat_move_reward
             self.num_repeated_moves += 1

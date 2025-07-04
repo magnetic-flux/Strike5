@@ -68,14 +68,16 @@ class MetricsCallback(BaseCallback):
         )
 
         # Log metrics to TensorBoard
-        self.logger.record("Telemetry/1. Average game length", np.mean(self.game_lengths_valid_moves))
-        self.logger.record("Telemetry/2. Average clears per game", self.clears / total_games)
-        self.logger.record("Telemetry/3. Average reward per game", np.mean(self.game_rewards))
-        self.logger.record("Telemetry/4. Fraction of moves that are valid with no clear", self.validity_0s / self.moves if self.moves > 0 else 0)
-        self.logger.record("Telemetry/5. Fraction moves that clear balls", self.clears / self.moves if self.moves > 0 else 0)
-        self.logger.record("Telemetry/6. Fraction of moves that are invalid with no path", self.validity_05s / self.moves if self.moves > 0 else 0)
-        self.logger.record("Telemetry/7. Average balls cleared on clear", avg_balls_cleared)
-        self.logger.record("Telemetry/8. Average number of repeat moves per game", self.num_repeat_moves / total_games)
+        self.logger.record("Telemetry/1. Average clears per game", self.clears / total_games)
+        self.logger.record("Telemetry/2. Average reward per game", np.mean(self.game_rewards))
+        self.logger.record("Telemetry/3. Fraction of moves that are valid with no clear", self.validity_0s / self.moves if self.moves > 0 else 0)
+        self.logger.record("Telemetry/4. Fraction moves that clear balls", self.clears / self.moves if self.moves > 0 else 0)
+        self.logger.record("Telemetry/5. Fraction of moves that are invalid with no path", self.validity_05s / self.moves if self.moves > 0 else 0)
+        self.logger.record("Telemetry/6. Average balls cleared on clear", avg_balls_cleared)
+        self.logger.record("Telemetry/7. Average number of repeat moves per game", self.num_repeat_moves / total_games)
+        self.logger.record("Telemetry/8. Fraction of moves that are repeat moves", self.num_repeat_moves / self.moves if self.moves > 0 else 0)
+        self.logger.record("Telemetry/9. Average game length", np.mean(self.game_lengths_valid_moves))
+
 
         # Reset all rollout counters
         self.moves = 0
