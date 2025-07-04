@@ -22,10 +22,11 @@ class Strike5Env(gym.Env):
         self.scale_rewards = scale_rewards
 
         self.action_space = Discrete(GRID_SIZE**4)
-        
+
         self.observation_space = Dict({
             "action_mask": Box(low=0, high=1, shape=(GRID_SIZE**4,), dtype=bool),
-            "observation": Box(low=0, high=7, shape=(GRID_SIZE**2 + SPAWN_COUNT,), dtype=np.int8),
+            "cnn_features": Box(low=0, high=7, shape=(GRID_SIZE, GRID_SIZE, 1), dtype=np.uint8),
+            "vector_features": Box(low=0, high=7, shape=(SPAWN_COUNT,), dtype=np.uint8),
         })
         
         self.state = None
@@ -48,17 +49,25 @@ class Strike5Env(gym.Env):
         
         return self.get_observation(), {}
 
-    def get_observation(self): return {"observation": np.concatenate([self.state["board"].flatten(), self.state["next_colors"]]).astype(np.int8), "action_mask": self.action_masks()}
+    def get_observation(self):
+        cnn_obs = np.reshape(self.state["board"], (GRID_SIZE, GRID_SIZE, 1)).astype(np.uint8)
+        vector_obs = self.state["next_colors"].astype(np.uint8)
+        
+        return {
+            "cnn_features": cnn_obs,
+            "vector_features": vector_obs,
+            "action_mask": self.action_masks()
+        }
 
     def action_masks(self):
         flat_board = self.state['board'].flatten()
-        start_mask = flat_board != 0  # Can only start from an occupied square
-        end_mask = flat_board == 0    # Can only end on an empty square
+        start_mask = flat_board != 0
+        end_mask = flat_board == 0
         
         valid_pairs_mask = np.outer(start_mask, end_mask)
 
         if not valid_pairs_mask.any():
-            return np.ones(GRID_SIZE**4, dtype=bool)
+            valid_pairs_mask[0, 0] = True
 
         return valid_pairs_mask.flatten()
 
@@ -73,7 +82,12 @@ class Strike5Env(gym.Env):
         self.num_attempted_moves += 1
 
         if validity == -1:
-            reward = self.clear_ball_reward
+            base_reward = self.clear_ball_reward
+            # Add bonus for longer lines
+            cleared_count = len(move_result["cleared"])
+            if cleared_count == 4: base_reward += 75
+            elif cleared_count >= 5: base_reward += 475
+            reward = base_reward
             self.num_valid_moves += 1
         elif validity == 0:
             reward = self.valid_move_reward
@@ -82,7 +96,6 @@ class Strike5Env(gym.Env):
         elif validity == 0.5:
             reward = self.invalid_move_reward
         else:
-            print("this should never execute")
             reward = self.invalid_move_reward
         
         last_start, last_end = divmod(self.last_action, GRID_SIZE**2)
@@ -91,11 +104,11 @@ class Strike5Env(gym.Env):
             reward += self.repeat_move_reward
             self.num_repeated_moves += 1
         self.last_action = action
-
-        if len(move_result["cleared"]) == 4: reward = 100
-        elif len(move_result["cleared"]) == 5: reward = 500
         
         if self.scale_rewards: reward = reward * self.num_valid_moves
+
+        # --- Definitive Fix: Clip the reward to a stable range ---
+        final_reward = np.clip(reward, -30, 30)
 
         terminated = (
             (num_empty == 0) or
@@ -110,7 +123,7 @@ class Strike5Env(gym.Env):
         observation = self.get_observation()
         info = {
             "validity": validity,
-            "reward": reward,
+            "reward": final_reward, # Return the clipped reward
             "score": self.state["score"],
             "terminated": terminated,
             "truncated": truncated,
@@ -118,6 +131,6 @@ class Strike5Env(gym.Env):
             "is_repeat": is_repeat,
             "num_cleared": len(move_result["cleared"])
         }
-        return observation, reward, terminated, truncated, info
+        return observation, final_reward, terminated, truncated, info
 
     def render(self, mode="human"): pass
