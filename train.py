@@ -62,9 +62,9 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 
 
 CLEAR_BALL_REWARD = 10
-REPEAT_MOVE_REWARD = -5
-VALID_MOVE_REWARD = 1
-INVALID_MOVE_REWARD = -5
+REPEAT_MOVE_REWARD = -1
+VALID_MOVE_REWARD = -0.1
+INVALID_MOVE_REWARD = -10
 
 SCALE_REWARDS = False
 CUSTOM_SPAWN_RANGE = (3, 3)
@@ -72,22 +72,22 @@ PROBABILITY_OF_REGULAR_SPAWN = 0
 
 END_GAME_BOARD_PERCENTAGE = 0.95
 END_GAME_NUM_VALID_MOVES = math.inf
-END_GAME_NUM_REPEATED_MOVES = math.inf
+END_GAME_NUM_REPEATED_MOVES = 10
 END_GAME_NUM_ATTEMPTED_MOVES = 250
 
-LEARNING_RATE = 0.0005
-N_STEPS = 512
+LEARNING_RATE = 0.00025
+N_STEPS = 1024
 BATCH_SIZE = 64
-N_EPOCHS = 5
+N_EPOCHS = 10
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_RANGE = 0.2
-ENTROPY_COEFFICIENT = 0.005
+ENTROPY_COEFFICIENT = 0.01
 VALUE_FUNCTION_COEFFICIENT = 0.5
 MAX_GRADIENT_NORM = 0.5
 
 RESUME_TRAINING_FROM_CHECKPOINT = True
-CHECKPOINT_PATH = "./logs_sb3/mask_8.zip"
+CHECKPOINT_PATH = "./logs_sb3/strike5_ppo_400000_steps.zip"
 SAVE_FREQUENCY = 50000
 TOTAL_TIMESTEPS = 4000000
 NUM_ENVIRONMENTS = 4
@@ -109,7 +109,6 @@ def make_env(rank, seed=69420):
             probability_of_regular_spawn=PROBABILITY_OF_REGULAR_SPAWN,
             scale_rewards=SCALE_REWARDS
         )
-        env = ActionMasker(env, lambda env: env.action_masks())
         return env
     return _init
 
@@ -162,7 +161,7 @@ def main():
         total_timesteps = TOTAL_TIMESTEPS,
         callback = [checkpoint_cb, metrics_cb],
         tb_log_name = "strike5_run",
-        reset_num_timesteps = not RESUME_TRAINING_FROM_CHECKPOINT
+        reset_num_timesteps = True
     )
 
     model.save(os.path.join(log_dir, "strike5_ppo_final"))
