@@ -7,9 +7,12 @@ from strike5_engine import reset_board, apply_move, spawn_balls, GRID_SIZE, SPAW
 class Strike5Env(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, clear_ball_reward, repeat_move_reward, valid_move_reward, invalid_move_reward, end_game_board_percentage=2, end_game_num_valid_moves=math.inf, end_game_num_repeated_moves=math.inf, end_game_num_attempted_moves=math.inf, custom_spawn_range=(3, 3), probability_of_regular_spawn=0, scale_rewards=False):
+    def __init__(self, clear_2_reward, clear_3_reward, clear_4_reward, clear_5_reward, repeat_move_reward, valid_move_reward, invalid_move_reward, end_game_board_percentage=2, end_game_num_valid_moves=math.inf, end_game_num_repeated_moves=math.inf, end_game_num_attempted_moves=math.inf, custom_spawn_range=(3, 3), probability_of_regular_spawn=0, scale_rewards=False):
         super().__init__()
-        self.clear_ball_reward = clear_ball_reward
+        self.clear_2_reward = clear_2_reward
+        self.clear_3_reward = clear_3_reward
+        self.clear_4_reward = clear_4_reward
+        self.clear_5_reward = clear_5_reward
         self.repeat_move_reward = repeat_move_reward
         self.valid_move_reward = valid_move_reward
         self.invalid_move_reward = invalid_move_reward
@@ -84,12 +87,15 @@ class Strike5Env(gym.Env):
         reward = 0
         if validity == -1:
             cleared_count = len(move_result["cleared"])
-            if cleared_count == 3: reward = self.clear_ball_reward
-            elif cleared_count == 4: reward = 50  # Do not change these values; I want the model to specifically learn to clear balls of length 4 and 5 (5 is the end goal), and they are extremeley unlikely to occur if moves are random
-            elif cleared_count == 5: reward = 100
+            if cleared_count == 2: reward = self.clear_2_reward
+            elif cleared_count == 3: reward = self.clear_3_reward
+            elif cleared_count == 4: reward = self.clear_4_reward
+            elif cleared_count == 5: reward = self.clear_5_reward
             self.num_valid_moves += 1
         elif validity == 0:
             reward = self.valid_move_reward
+            path_length_bonus = move_result["path_length"] * 0.01
+            reward += path_length_bonus
             self.num_valid_moves += 1
             self.num_balls_on_valid = GRID_SIZE**2 - len(self.state["empties"])
         elif validity == 0.5:

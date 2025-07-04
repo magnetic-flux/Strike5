@@ -84,7 +84,7 @@ def is_valid_move(board, start, end): # Returns 0 if start is occupied and end i
 
 def find_matches(board, positions): # Check for lines going through the given positions and returns a list of cell tuples to clear
     to_clear = set()
-    directions = [((1,0),(-1,0)), ((0,1),(0,-1)), ((1,1),(-1,-1)), ((1,-1),(-1,1))]
+    directions = [((1,0),(-1,0)), ((0,1),(-1,-1)), ((1,-1),(-1,1))]
     
     for (r0,c0) in positions:
         color = board[r0, c0]
@@ -103,8 +103,12 @@ def find_matches(board, positions): # Check for lines going through the given po
 def apply_move(state, start, end): # Returns valididty of move; if valid, moves ball, increments moves, clears matches, updates score, and spawns new balls
     board = state['board']
     validity = is_valid_move(board, start, end)
-    result = {"validity": validity, "cleared": [], "spawned": []}
+    result = {"validity": validity, "cleared": [], "spawned": [], "path_length": 0}
     if validity != 0: return result
+    
+    path = find_path(board, start, end)
+    if path:
+        result["path_length"] = len(path)
     
     board[end], board[start] = board[start], 0
     state['empties'].discard(end); state['empties'].add(start)

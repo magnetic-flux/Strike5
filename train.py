@@ -12,58 +12,16 @@ from sb3_contrib import MaskablePPO
 from strike5_environment import Strike5Env
 from metrics_callback import MetricsCallback
 
-
-class CustomCombinedExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space: spaces.Dict, cnn_output_dim: int = 256):
-        total_concat_size = cnn_output_dim + 32
-        super().__init__(observation_space, features_dim=total_concat_size)
-
-        cnn_space = observation_space.spaces["cnn_features"]
-        cnn_extractor = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Flatten(),
-        )
-        with torch.no_grad():
-            sample_cnn_input = torch.as_tensor(cnn_space.sample()[None]).float()
-            n_flatten = cnn_extractor(sample_cnn_input.permute(0, 3, 1, 2)).shape[1]
-
-        cnn_linear = nn.Sequential(
-            nn.Linear(n_flatten, cnn_output_dim),
-            nn.LayerNorm(cnn_output_dim),
-            nn.ReLU()
-        )
-        self.cnn = nn.Sequential(cnn_extractor, cnn_linear)
-
-        vector_space = observation_space.spaces["vector_features"]
-        self.vector_mlp = nn.Sequential(
-            nn.Linear(vector_space.shape[0], 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.LayerNorm(32),
-            nn.ReLU()
-        )
-
-    def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
-        cnn_input = observations["cnn_features"].permute(0, 3, 1, 2)
-        cnn_features = self.cnn(cnn_input)
-        
-        vector_features = self.vector_mlp(observations["vector_features"])
-        
-        return torch.cat([cnn_features, vector_features], dim=1)
-
-
-CLEAR_BALL_REWARD = 10
-REPEAT_MOVE_REWARD = -100
+CLEAR_2_REWARD = 1
+CLEAR_3_REWARD = 10
+CLEAR_4_REWARD = 50
+CLEAR_5_REWARD = 100
+REPEAT_MOVE_REWARD = -10
 VALID_MOVE_REWARD = -0.1
 INVALID_MOVE_REWARD = -10
 
 SCALE_REWARDS = False
-CUSTOM_SPAWN_RANGE = (3, 25)
+CUSTOM_SPAWN_RANGE = (3, 3)
 PROBABILITY_OF_REGULAR_SPAWN = 0
 
 END_GAME_BOARD_PERCENTAGE = 0.95
@@ -82,18 +40,60 @@ ENTROPY_COEFFICIENT = 0.01
 VALUE_FUNCTION_COEFFICIENT = 0.5
 MAX_GRADIENT_NORM = 0.5
 
-RESUME_TRAINING_FROM_CHECKPOINT = True
-CHECKPOINT_PATH = "./logs_sb3/strike5_ppo_200000_steps.zip"
-SAVE_FREQUENCY = 50000
-TOTAL_TIMESTEPS = 4000000
+RESUME_TRAINING_FROM_CHECKPOINT = False
+CHECKPOINT_PATH = "./logs_sb3/large_cnn.zip"
+SAVE_FREQUENCY = 100000
+TOTAL_TIMESTEPS = 5000000
 NUM_ENVIRONMENTS = 2
+
+class CustomCombinedExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Dict, cnn_output_dim: int = 128):
+        total_concat_size = cnn_output_dim + 16
+        super().__init__(observation_space, features_dim=total_concat_size)
+
+        cnn_space = observation_space.spaces["cnn_features"]
+        cnn_extractor = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        with torch.no_grad():
+            sample_cnn_input = torch.as_tensor(cnn_space.sample()[None]).float()
+            n_flatten = cnn_extractor(sample_cnn_input.permute(0, 3, 1, 2)).shape[1]
+
+        cnn_linear = nn.Sequential(
+            nn.Linear(n_flatten, cnn_output_dim),
+            nn.LayerNorm(cnn_output_dim),
+            nn.ReLU()
+        )
+        self.cnn = nn.Sequential(cnn_extractor, cnn_linear)
+
+        vector_space = observation_space.spaces["vector_features"]
+        self.vector_mlp = nn.Sequential(
+            nn.Linear(vector_space.shape[0], 16),
+            nn.LayerNorm(16),
+            nn.ReLU()
+        )
+
+    def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
+        cnn_input = observations["cnn_features"].permute(0, 3, 1, 2)
+        cnn_features = self.cnn(cnn_input)
+        
+        vector_features = self.vector_mlp(observations["vector_features"])
+        
+        return torch.cat([cnn_features, vector_features], dim=1)
 
 def make_env(rank, seed=69420):
     def _init():
         np.random.seed(seed + rank)
         random.seed(seed + rank)
         env = Strike5Env(
-            clear_ball_reward=CLEAR_BALL_REWARD,
+            clear_2_reward=CLEAR_2_REWARD,
+            clear_3_reward=CLEAR_3_REWARD,
+            clear_4_reward=CLEAR_4_REWARD,
+            clear_5_reward=CLEAR_5_REWARD,
             repeat_move_reward=REPEAT_MOVE_REWARD,
             valid_move_reward=VALID_MOVE_REWARD,
             invalid_move_reward=INVALID_MOVE_REWARD,
@@ -116,7 +116,7 @@ def main():
 
     policy_kwargs = dict(
         features_extractor_class=CustomCombinedExtractor,
-        features_extractor_kwargs=dict(cnn_output_dim=256),
+        features_extractor_kwargs=dict(cnn_output_dim=128),
     )
 
     model = MaskablePPO(
