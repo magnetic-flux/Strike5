@@ -3,7 +3,7 @@ from sb3_contrib import MaskablePPO
 from strike5_engine import reset_board, empty_cells, is_valid_move, apply_move, spawn_balls, draw_state, animate_move, SCREEN_WIDTH, SCREEN_HEIGHT, HEADER_FONT_SIZE, HEADER_HEIGHT, MARGIN, CELL_SIZE, GRID_SIZE, SPAWN_COUNT
 
 AI_HELP = True
-MODEL_PATH = "./logs_sb3/strike5_ppo_1000000_steps.zip"
+MODEL_PATH = "./logs_sb3/strike5_ppo_2900000_steps.zip"
 AI_START_COLOR = (50, 255, 50)
 AI_END_COLOR = (255, 165, 0)
 

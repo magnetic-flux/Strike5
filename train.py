@@ -13,7 +13,7 @@ from strike5_environment import Strike5Env
 from metrics_callback import MetricsCallback
 
 CLEAR_2_REWARD = 1
-CLEAR_3_REWARD = 10
+CLEAR_3_REWARD = 20
 CLEAR_4_REWARD = 50
 CLEAR_5_REWARD = 100
 REPEAT_MOVE_REWARD = -10
@@ -40,22 +40,24 @@ ENTROPY_COEFFICIENT = 0.01
 VALUE_FUNCTION_COEFFICIENT = 0.5
 MAX_GRADIENT_NORM = 0.5
 
-RESUME_TRAINING_FROM_CHECKPOINT = False
-CHECKPOINT_PATH = "./logs_sb3/large_cnn.zip"
+RESUME_TRAINING_FROM_CHECKPOINT = True
+CHECKPOINT_PATH = "./logs_sb3/large_cnn_2.zip"
 SAVE_FREQUENCY = 100000
 TOTAL_TIMESTEPS = 5000000
 NUM_ENVIRONMENTS = 2
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space: spaces.Dict, cnn_output_dim: int = 128):
-        total_concat_size = cnn_output_dim + 16
+    def __init__(self, observation_space: spaces.Dict, cnn_output_dim: int = 256):
+        total_concat_size = cnn_output_dim + 32
         super().__init__(observation_space, features_dim=total_concat_size)
 
         cnn_space = observation_space.spaces["cnn_features"]
         cnn_extractor = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Flatten(),
         )
@@ -72,8 +74,10 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 
         vector_space = observation_space.spaces["vector_features"]
         self.vector_mlp = nn.Sequential(
-            nn.Linear(vector_space.shape[0], 16),
-            nn.LayerNorm(16),
+            nn.Linear(vector_space.shape[0], 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.LayerNorm(32),
             nn.ReLU()
         )
 
@@ -116,7 +120,7 @@ def main():
 
     policy_kwargs = dict(
         features_extractor_class=CustomCombinedExtractor,
-        features_extractor_kwargs=dict(cnn_output_dim=128),
+        features_extractor_kwargs=dict(cnn_output_dim=256),
     )
 
     model = MaskablePPO(
